@@ -3,13 +3,18 @@
 apt update
 apt install -y python3-flask
 
-export TIRITH_HOME=/home/ubuntu/repo.git
-
-mkdir $TIRITH_HOME
-cd $TIRITH_HOME
+mkdir /home/ubuntu/repo.git
+cd /home/ubuntu/repo.git
 git init
 git config user.name "Tirith Initialization"
 git config user.email "init@tiri.th"
+git config receive.denyCurrentBranch ignore
+
+cat > .git/hooks/post-receive <<EOF
+#!/bin/bash
+git reset --hard
+EOF
+chmod +x .git/hooks/post-receive
 
 cat > app.py <<EOF
 from flask import Flask
@@ -27,10 +32,15 @@ cat > README.md <<EOF
 Project created with Tirith (contact: pierre.ballif@polymtl.ca)
 EOF
 
-git add app.py README.md && git commit -m "Initializing repository"
+cat > .gitignore <<EOF
+instances.txt
+EOF
 
-chown ubuntu $TIRITH_HOME -R
+git add app.py README.md .gitignore && git commit -m "Initializing repository"
 
-export FLASK_APP=$TIRITH_HOME
+chown ubuntu . -R
 
-flask run
+export FLASK_APP=/home/ubuntu/repo.git/app.py
+export FLASK_ENVIRONMENT=development
+
+nohup flask run -p 80 -h 0.0.0.0 > /home/ubuntu/log.txt 2>&1 &
