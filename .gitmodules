@@ -1,0 +1,3 @@
+[submodule "default-app"]
+	path = default-app
+	url = git@github.com:Warggr/default-tirith-app.git

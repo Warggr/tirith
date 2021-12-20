@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cat instances.txt | grep "instance" | cut -f 2 -d ' ' | while read line; do aws ec2 terminate-instances --instance-ids $line; done
-rm instances.txt
+python3 $HOME/.tirith/aws/main.py delete .instances.json
 
 git remote remove tirith
+rm .git/hooks/post-commit

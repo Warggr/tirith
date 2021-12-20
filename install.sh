@@ -5,7 +5,6 @@ if ! [ -d $HOME/.tirith ] ; then
 	mkdir $HOME/.tirith
 fi
 
-cp ./become-gitserver.sh $HOME/.tirith/become-gitserver.sh
 if [ $# -eq 0 ]; then 
 	echo "Where is your AWS key situated? (Please enter the full path - the ~ character is not allowed)";
 	read key_filename;
@@ -15,23 +14,16 @@ fi
 
 ln -s $key_filename $HOME/.tirith/key.pem
 
-if aws ec2 describe-security-groups --group-names "white-guard-v1" --query SecurityGroups[0] > /dev/null ; then
-	echo "Security group already exists"
-	GROUP_ID=$(aws ec2 describe-security-groups --group-names "white-guard-v1" --query SecurityGroups[0].GroupId | tr -d '"');
-else
-	echo "Creating security group"
-		GROUP_ID=$(
-		aws ec2 create-security-group \
-		--description "Allow SSH, HTTP and HTTPS" \
-		--group-name "white-guard-v1" \
-		--tag-specifications "ResourceType=security-group,Tags=[{Key=codeline,Value=white-guard},{Key=version,Value=1}]"\
-		--query GroupId | tr -d '"'
-	)
-	echo "sec-group" $GROUP_ID >> $HOME/.tirith/instances.txt
-fi
+SECURITY_GROUP=$(python3 ./aws/security_group.py create)
 
-aws ec2 authorize-security-group-ingress --group-id $GROUP_ID --ip-permissions '[
-{"IpProtocol": "tcp","FromPort": 22,"ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0"}]},
-{"IpProtocol": "tcp","FromPort": 80,"ToPort": 80,"IpRanges": [{"CidrIp": "0.0.0.0/0"}]},
-{"IpProtocol": "tcp","FromPort": 443,"ToPort": 443,"IpRanges": [{"CidrIp": "0.0.0.0/0"}]}
-]' > /dev/null
+echo $SECURITY_GROUP > $HOME/.tirith/security_group.json
+
+cat > aws/config.py <<EOF
+#!/bin/python3
+KEYPAIR_NAME = "$(basename $key_filename .pem)"
+SECURITY_GROUP = "$SECURITY_GROUP"
+EOF
+
+cp ./aws $HOME/.tirith -r
+cp ./become-gitserver.sh $HOME/.tirith
+cp ./create.sh $HOME/.tirith

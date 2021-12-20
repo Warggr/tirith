@@ -1,13 +1,18 @@
 #!/bin/bash
 
-apt update
-apt install -y python3-flask
+sudo ln -sf /usr/bin/python3 /usr/bin/python #use python3
 
-mkdir /home/ubuntu/repo.git
-cd /home/ubuntu/repo.git
+yum install pip git -y
+pip install flask #flask-sqlalchemy
+
+cd /home/ec2-user
+
+mkdir repo.git && cd repo.git
 git init
-git config user.name "Tirith Initialization"
-git config user.email "init@tiri.th"
+git config core.sshCommand "ssh -o StrictHostKeyChecking=no"
+git remote add origin git@github.com:Warggr/default-tirith-app.git
+git pull origin main
+git remote remove origin
 git config receive.denyCurrentBranch ignore
 
 cat > .git/hooks/post-receive <<EOF
@@ -16,31 +21,9 @@ git reset --hard
 EOF
 chmod +x .git/hooks/post-receive
 
-cat > app.py <<EOF
-from flask import Flask
-app = Flask(__name__)
+chown ec2-user . -R
 
-@app.route("/")
-def hello():
-    return "Hello World!"
-
-if __name__ == "__main__":
-    app.run()
-EOF
-
-cat > README.md <<EOF
-Project created with Tirith (contact: pierre.ballif@polymtl.ca)
-EOF
-
-cat > .gitignore <<EOF
-instances.txt
-EOF
-
-git add app.py README.md .gitignore && git commit -m "Initializing repository"
-
-chown ubuntu . -R
-
-export FLASK_APP=/home/ubuntu/repo.git/app.py
+export FLASK_APP=/home/ec2-user/repo.git/app.py
 export FLASK_ENVIRONMENT=development
 
-nohup flask run -p 80 -h 0.0.0.0 > /home/ubuntu/log.txt 2>&1 &
+nohup flask run -p 5000 -h 0.0.0.0 > /home/ec2-user/log.txt 2>&1 &

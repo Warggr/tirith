@@ -5,6 +5,6 @@ if ! [ $HOME/.tirith ] ; then
 	exit 1;
 fi
 
-rm $HOME/.tirith -r
+python3 ./aws/security_group.py delete < $HOME/.tirith/security_group.json
 
-aws ec2 delete-security-group --group-name "white-guard-v1"
+rm $HOME/.tirith -r
