@@ -7,7 +7,7 @@ from amazon_manager import AmazonManager
 
 if __name__ == '__main__':
     manager = AmazonManager()
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 3 and (len(sys.argv) != 4 or sys.argv[1] != 'create'):
         try:
             manager.create()
             print(f'Your load balancer is deployed at {manager.load_balancer.dns_name}.')
@@ -20,8 +20,9 @@ if __name__ == '__main__':
         else:
             if sys.argv[1] == 'create':
                 with open(sys.argv[2], 'x') as file:
-                    manager.create()
-                    print('DNS_NAME:', manager.load_balancer.dns_name)
+                    instances_per_cluster = int(sys.argv[3]) if len(sys.argv)==4 else 1
+                    manager.create(instances_per_cluster)
+                    print('DNS_NAME', manager.load_balancer.dns_name)
                     json.dump(manager.serialize(), file)
             else:
                 with open(sys.argv[2], 'r') as file:
@@ -36,7 +37,7 @@ if __name__ == '__main__':
                         manager.stop()
                     elif sys.argv[1] == 'start':
                         manager.restart()
-                        print('DNS_NAME:', manager.load_balancer.dns_name)
+                        print('DNS_NAME', manager.load_balancer.dns_name)
                     elif sys.argv[1] == 'more':
                         manager.more()
                     elif sys.argv[1] == 'less':

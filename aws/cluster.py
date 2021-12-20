@@ -1,7 +1,5 @@
 #!/bin/python3
 
-INSTANCES_PER_CLUSTER = 1
-
 import os
 import sys
 import boto3
@@ -22,16 +20,16 @@ class SubCluster:
         self.target_group_arn = None
         self.zone = None
 
-    def create(self, batch_name, vpc_id, instanceType = {'type': 't2.micro', 'zone': 'us-east-1a'}):
+    def create(self, nb_instances, batch_name, vpc_id, instanceType = {'type': 't2.micro', 'zone': 'us-east-1a'}):
         self.instance_type = instanceType['type']
         self.zone = instanceType['zone']
         try:
-            self.create_instances(batch_name)
+            self.create_instances(nb_instances, batch_name)
 
-            self.create_target_group_if_needed(vpc_id)
+            self.create_target_group_if_needed(vpc_id, batch_name)
 
             # Reference: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/elbv2.html#ElasticLoadBalancingv2.Client.register_targets
-            targets = [ { 'Id': i, 'Port': 5000 } for i in self.instance_ids]
+            targets = [ { 'Id': i, 'Port': 80 } for i in self.instance_ids]
 
             elbv2.register_targets(
                     TargetGroupArn=self.target_group_arn,
@@ -52,14 +50,11 @@ class SubCluster:
         waiter.wait( InstanceIds=self.instance_ids )
         self.instance_ids = []
 
-    def htmlpath(self):
-        return f'/cluster{self.cluster_nb}'
-
     def target_group_name(self):
         return f'cluster-{self.cluster_nb}'
 
-    def create_instances(self, batch_name='anonymous', script_filename = os.path.expanduser('~/.tirith/become-gitserver.sh')):
-        print(f'Create {INSTANCES_PER_CLUSTER} instances')
+    def create_instances(self, nb_instances, batch_name='anonymous', script_filename = os.path.expanduser('~/.tirith/become-gitserver.sh')):
+        print(f'Create {nb_instances} instances')
 
         with open(script_filename, 'r') as file:
             script = file.read()
@@ -69,8 +64,8 @@ class SubCluster:
                 script = file.read()
         resp = ec2.run_instances(ImageId=IMAGE_ID,
                             InstanceType=self.instance_type,
-                            MinCount=INSTANCES_PER_CLUSTER,
-                            MaxCount=INSTANCES_PER_CLUSTER,
+                            MinCount=nb_instances,
+                            MaxCount=nb_instances,
                             KeyName=KEYPAIR_NAME,
                             SecurityGroupIds=[SECURITY_GROUP],
                             UserData=script,
@@ -91,14 +86,16 @@ class SubCluster:
                         )
 
         self.instance_ids = [ instance['InstanceId'] for instance in resp['Instances'] ]
-        for instance in resp['Instances']:
-            print('INSTANCE_DNS', cluster_nb, instance['PublicDnsName'])
 
         waiter = ec2.get_waiter('instance_running')
         waiter.wait(InstanceIds=self.instance_ids)
 
-    def create_target_group(self, vpc_id):
+        for instance in ec2.describe_instances(InstanceIds=self.instance_ids)['Reservations'][0]['Instances']:
+            print('INSTANCE_DNS', self.cluster_nb, instance['PublicDnsName'])
+
+    def create_target_group(self, vpc_id, batch_name):
         print('Create target group')
+        name = f'{batch_name}-target-group-{self.cluster_nb}'
         resp = elbv2.create_target_group(
             Name=self.target_group_name(),
             Protocol='HTTP',
@@ -106,29 +103,30 @@ class SubCluster:
             Port=80,
             VpcId=vpc_id,
             HealthCheckEnabled=True,
-            HealthCheckPath=self.htmlpath(),
+            HealthCheckPath="/tirith-health-checks",
             HealthCheckIntervalSeconds=10,
             HealthyThresholdCount=3,
             TargetType='instance',
             Tags=[
                 {
                     'Key': 'Name',
-                    'Value': f'target-group-{self.cluster_nb}'
+                    'Value': self.target_group_name(batch_name)
                 },
             ]
         )
-        self.target_group_arn = resp['TargetGroups'][0]['TargetGroupArn']
-        return self.target_group_arn
+        resp = elbv2.describe_target_groups(Names=[self.target_group_name(batch_name)])
+        print(resp)
+        self.target_group_arn = elbv2.describe_target_groups(Names=[self.target_group_name(batch_name)])['TargetGroups'][0]['TargetGroupArn']
 
-    def create_target_group_if_needed(self, vpc_id):
+    def create_target_group_if_needed(self, vpc_id, batch_name):
         try:
-            self.create_target_group(vpc_id) #will succeed if the target group didn't exist, or existed with the same config
+            self.create_target_group(vpc_id, batch_name) #will succeed if the target group didn't exist, or existed with the same config
         except elbv2.exceptions.DuplicateTargetGroupNameException:
             print('Target group exists, deleting old group and create new group...')
-            response = elbv2.describe_target_groups( Names=[ self.target_group_name() ] )
+            response = elbv2.describe_target_groups( Names=[ self.target_group_name(batch_name) ] )
             elbv2.delete_target_group(TargetGroupArn=response['TargetGroups'][0]['TargetGroupArn'])
 
-            self.create_target_group(vpc_id)
+            self.create_target_group(vpc_id, batch_name)
 
     def delete_target_group(self):
         if self.target_group_arn:

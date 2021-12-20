@@ -4,7 +4,9 @@ if [ -d .git ]; then
 	exit 1;
 fi
 
-python3 $HOME/tirith/aws/main.py create .instances.json > output
+python3 $HOME/.tirith/aws/main.py create .instances.json | tee output
+
+INSTANCE_DNS=$(cat output | grep "DNS_NAME" | cut -d ' ' -f 2)
 
 echo "Done! Your Flask app is deployed at http://$INSTANCE_DNS/"
 
@@ -19,6 +21,8 @@ cat output | grep "INSTANCE_DNS 1" | cut -d ' ' -f 3 | while read line; do git r
 cat output | grep "INSTANCE_DNS 2" | cut -d ' ' -f 3 | while read line; do git remote set-url --add green $line
 git remote set-url --delete green http://dummy_url
 git remote set-url --delete blue http://dummy_url
+
+rm output
 
 git pull green master
 git fetch blue

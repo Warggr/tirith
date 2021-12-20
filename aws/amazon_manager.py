@@ -32,55 +32,31 @@ class AmazonManager:
         self.children = []
         self.load_balancer = LoadBalancer()
         self.listener_arn = None
-        self.database_id = 
         self.rules_arn = []
         self.batch_name = 'NotConfigured'
         self.running = False
         self.deployement_percentage = 0
 
-    def create(self):
+    def create(self, instances_per_cluster):
         self.batch_name = create_random_name()
         print('Starting batch ' + self.batch_name)
         vpc_id = next(iter(ec2_resource.vpcs.all())).id
 
-        """response = rds.create_db_cluster(
-            DBClusterIdentifier=f'{self.batch_name}-tirith-feedback',
-            Engine='aurora',
-            EngineMode='serverless',
-            Port=3306,
-            MasterUsername='kingofgondor',
-            MasterUserPassword='kingofgondor',
-            Tags=[
-                { 'Key': 'Batch', 'Value': self.batch_name},
-            ],
-            ScalingConfiguration={
-                'MinCapacity': 1,
-                'MaxCapacity': 1,
-                'AutoPause': True,
-                'SecondsUntilAutoPause': 300,
-                'TimeoutAction': 'RollbackCapacityChange',
-                'SecondsBeforeTimeout': 60
-            }
-        )
-        self.database_id = response['DBCluster']['DBClusterIdentifier']
-        rds.authorize_db_security_group_ingress(
-            DBSecurityGroupName=response['DBCluster']['VpcSecurityGroups'][0]['VpcSecurityGroupId'],
-            EC2SecurityGroupId=SECURITY_GROUP
-        )
-        rds_data.execute_statement(database=f'{self.batch_name}-tirith-feedback')"""
-
         threads = []
         for cluster_nb, instance_type in enumerate(AmazonManager.INSTANCE_TYPE_LIST):
             child = SubCluster(cluster_nb+1)
-            x = threading.Thread( target=child.create, args=(self.batch_name, vpc_id, instance_type) )
+            x = threading.Thread( target=child.create, args=(instances_per_cluster, self.batch_name, vpc_id, instance_type) )
             x.start()
             threads.append(x)
             self.children.append( child )
 
-        self.load_balancer.create()
+        self.load_balancer.create(self.batch_name)
 
         for thread in threads:
             thread.join()
+
+        self.create_listener()
+
         print('Waiting for health checks (might take 5-10 minutes)...')
         for child in self.children:
             child.wait_for_group()
@@ -88,7 +64,6 @@ class AmazonManager:
         self.running = True
 
     def delete(self):
-        """rds.delete_db_cluster(DBClusterIdentifier=self.database_id, SkipFinalSnapshot=True)"""
         self.delete_listener()
         self.load_balancer.delete()
 
@@ -108,7 +83,7 @@ class AmazonManager:
         self.running = True
 
     def stochastic(self):
-        return [ {   
+        return [ {
             'Type': 'forward',
             'ForwardConfig': {
                 'TargetGroups': [
@@ -131,7 +106,7 @@ class AmazonManager:
     def create_listener(self):
         print('Create listener')
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/elbv2.html#ElasticLoadBalancingv2.Client.create_listener
-        listener = elbv2.create_listener(LoadBalancerArn=self.load_balancer.arn, Protocol='HTTP', Port=80, DefaultActions=self.stochastic(0))
+        listener = elbv2.create_listener(LoadBalancerArn=self.load_balancer.arn, Protocol='HTTP', Port=80, DefaultActions=self.stochastic())
         self.listener_arn = listener['Listeners'][0]['ListenerArn']
 
     def update_listener(self):
@@ -167,7 +142,7 @@ class AmazonManager:
     def serialize(self):
         ret = {
                 key:self.__dict__[key]
-                    for key in [ "batch_name", "rules_arn", "listener_arn", "running"] 
+                    for key in [ "batch_name", "rules_arn", "listener_arn", "running", "deployement_percentage"] 
             }
         ret["load_balancer"] = self.load_balancer.serialize()
         ret["children"] = [ child.serialize() for child in self.children ]
