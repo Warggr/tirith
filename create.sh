@@ -35,8 +35,8 @@ cat > .git/hooks/post-commit <<EOF
 python3 \$HOME/.tirith/aws/main.py fill .instances.json
 python3 \$HOME/.tirith/aws/main.py switch .instances.json
 
-git push \$(cat newest_color.txt) master
+git push \$(cat .newest_color.txt) master
 
-cat .newest_color.txt | sed -e 's/blue/tmp/g' -e 's/green/blue/g' -e 's/tmp/green/g' > .newest_color.txt
+cat .newest_color.txt | sed 's/blue/tmp/g' | sed 's/green/blue/g' | sed 's/tmp/green/g' > .newest_color.txt
 EOF
 chmod +x .git/hooks/post-commit

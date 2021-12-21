@@ -28,6 +28,7 @@ export FLASK_APP=/home/ec2-user/repo.git/app.py
 export FLASK_ENVIRONMENT=development
 
 touch log.txt
-chown ec2-user log.txt
+chmod 777 log.txt
 
 nohup /usr/local/bin/flask run -p 80 -h 0.0.0.0 > /home/ec2-user/log.txt 2>&1 &
+
