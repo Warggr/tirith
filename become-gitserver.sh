@@ -5,6 +5,9 @@ pip3 install flask #flask-sqlalchemy
 
 cd /home/ec2-user
 
+touch log.txt
+chmod 777 log.txt
+
 mkdir repo.git && cd repo.git
 git init
 git config core.sshCommand "ssh -o StrictHostKeyChecking=no"
@@ -27,8 +30,4 @@ chown ec2-user . -R
 export FLASK_APP=/home/ec2-user/repo.git/app.py
 export FLASK_ENVIRONMENT=development
 
-touch log.txt
-chmod 777 log.txt
-
 nohup /usr/local/bin/flask run -p 80 -h 0.0.0.0 > /home/ec2-user/log.txt 2>&1 &
-

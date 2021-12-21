@@ -132,6 +132,12 @@ class SubCluster:
             elbv2.delete_target_group(TargetGroupArn=self.target_group_arn)
             self.target_group_arn = None
 
+    def stop(self):
+        ec2.stop_instances(InstanceIds=self.instance_ids)
+
+    def restart(self):
+        ec2.start_instances(InstanceIds=self.instance_ids)
+
     def wait_for_group(self):
         #https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/elbv2.html#ElasticLoadBalancingv2.Waiter.TargetInService
         waiter = elbv2.get_waiter('target_in_service')
