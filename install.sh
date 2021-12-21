@@ -27,3 +27,4 @@ EOF
 cp ./aws $HOME/.tirith -r
 cp ./become-gitserver.sh $HOME/.tirith
 cp ./create.sh $HOME/.tirith
+cp ./terminate.sh $HOME/.tirith

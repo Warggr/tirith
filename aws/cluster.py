@@ -50,8 +50,8 @@ class SubCluster:
         waiter.wait( InstanceIds=self.instance_ids )
         self.instance_ids = []
 
-    def target_group_name(self):
-        return f'cluster-{self.cluster_nb}'
+    def target_group_name(self, batch_name):
+        return f'{batch_name}-cluster-{self.cluster_nb}'
 
     def create_instances(self, nb_instances, batch_name='anonymous', script_filename = os.path.expanduser('~/.tirith/become-gitserver.sh')):
         print(f'Create {nb_instances} instances')
@@ -95,9 +95,8 @@ class SubCluster:
 
     def create_target_group(self, vpc_id, batch_name):
         print('Create target group')
-        name = f'{batch_name}-target-group-{self.cluster_nb}'
         resp = elbv2.create_target_group(
-            Name=self.target_group_name(),
+            Name=self.target_group_name(batch_name),
             Protocol='HTTP',
             ProtocolVersion='HTTP1',
             Port=80,
@@ -114,8 +113,6 @@ class SubCluster:
                 },
             ]
         )
-        resp = elbv2.describe_target_groups(Names=[self.target_group_name(batch_name)])
-        print(resp)
         self.target_group_arn = elbv2.describe_target_groups(Names=[self.target_group_name(batch_name)])['TargetGroups'][0]['TargetGroupArn']
 
     def create_target_group_if_needed(self, vpc_id, batch_name):

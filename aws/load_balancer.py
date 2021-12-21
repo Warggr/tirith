@@ -20,7 +20,6 @@ class LoadBalancer:
             Type='application',
             IpAddressType='ipv4'
         )
-        print(resp)
         self.arn = resp['LoadBalancers'][0]['LoadBalancerArn']
         self.dns_name = resp['LoadBalancers'][0]['DNSName']
     def delete(self):

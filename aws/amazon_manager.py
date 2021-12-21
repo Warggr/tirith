@@ -32,7 +32,6 @@ class AmazonManager:
         self.children = []
         self.load_balancer = LoadBalancer()
         self.listener_arn = None
-        self.rules_arn = []
         self.batch_name = 'NotConfigured'
         self.running = False
         self.deployement_percentage = 0
@@ -110,7 +109,7 @@ class AmazonManager:
         self.listener_arn = listener['Listeners'][0]['ListenerArn']
 
     def update_listener(self):
-        elbv2.modify_listener(LoadBalancerArn=self.load_balancer.arn, DefaultActions=self.stochastic())
+        elbv2.modify_listener(ListenerArn=self.listener_arn, DefaultActions=self.stochastic())
 
     def fill(self):
         self.deployement_percentage = 100
@@ -126,11 +125,13 @@ class AmazonManager:
         self.deployement_percentage -= 10
         if self.deployement_percentage < 0:
             self.deployement_percentage = 0
+        self.update_listener()
 
     def more(self):
         self.deployement_percentage += 10
         if self.deployement_percentage > 100:
             self.deployement_percentage = 100
+        self.update_listener()
 
     def delete_listener(self):
         if self.listener_arn:
@@ -142,7 +143,7 @@ class AmazonManager:
     def serialize(self):
         ret = {
                 key:self.__dict__[key]
-                    for key in [ "batch_name", "rules_arn", "listener_arn", "running", "deployement_percentage"] 
+                    for key in [ "batch_name", "listener_arn", "running", "deployement_percentage"] 
             }
         ret["load_balancer"] = self.load_balancer.serialize()
         ret["children"] = [ child.serialize() for child in self.children ]
@@ -151,5 +152,5 @@ class AmazonManager:
         for key in data:
             self.__dict__[key] = data[key]
         self.load_balancer = LoadBalancer().unserialize(self.load_balancer)
-        self.children = [ SubCluster(self, i).unserialize(child) for (i,child) in enumerate(self.children) ]
+        self.children = [ SubCluster(i).unserialize(child) for (i,child) in enumerate(self.children) ]
         return self
